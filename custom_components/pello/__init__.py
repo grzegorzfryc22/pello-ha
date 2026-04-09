@@ -15,7 +15,7 @@ from .const import DOMAIN, DEFAULT_SCAN_INTERVAL
 _LOGGER = logging.getLogger(__name__)
 
 # Używamy oficjalnych Enumów zamiast zwykłego tekstu
-PLATFORMS = [Platform.SENSOR, Platform.SELECT]
+PLATFORMS = [Platform.SENSOR, Platform.SELECT, Platform.NUMBER]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Uruchamia integrację na podstawie danych z UI."""
