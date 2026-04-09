@@ -39,7 +39,8 @@ SENSORS = (
     ("alarm_pod_zaplon", "Alarm podajnik zapłon", None, None, "mdi:alert-fire", EntityCategory.DIAGNOSTIC),
     ("alarm_tkot_90", "Alarm temp kotła", None, None, "mdi:alert-thermometer", EntityCategory.DIAGNOSTIC),
     ("alarm_tpod_hi", "Alarm temp podajnik", None, None, "mdi:alert-thermometer", EntityCategory.DIAGNOSTIC),
-    ("alarm_termik", "Alarm STB (Termik)", None, None, "mdi:alert-octagon", EntityCategory.DIAGNOSTIC)
+    ("alarm_termik", "Alarm STB (Termik)", None, None, "mdi:alert-octagon", EntityCategory.DIAGNOSTIC),
+    ("alarm_zasobnik", "Alarm zasobnika", None, None, "mdi:alert-circle", EntityCategory.DIAGNOSTIC),
 )
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
@@ -94,7 +95,8 @@ class PelloSensor(CoordinatorEntity, SensorEntity):
                 if self._key == "tryb_auto_state":
                     tryb_map = {
                         "0": "Ręczny",
-                        "1": "Automatyczny"
+                        "1": "Automatyczny",
+                        "2": "Alarmowy",
                     }
                     return tryb_map.get(str(val), f"Nieznany ({val})")
 
@@ -130,9 +132,10 @@ class PelloSensor(CoordinatorEntity, SensorEntity):
                     except ValueError:
                         return None
 
-                # 7. Reszta sensorów (liczby zaokrąglamy)
+                # 7. Reszta sensorów — liczby całkowite bez .0, reszta 1 miejsce po przecinku
                 try:
-                    return round(float(val), 1)
+                    f = float(val)
+                    return int(f) if f == int(f) else round(f, 1)
                 except ValueError:
                     return val
         return None

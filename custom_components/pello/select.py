@@ -35,14 +35,14 @@ class PelloTrybZimaLatoSelect(CoordinatorEntity, SelectEntity):
     def current_option(self):
         """Zwraca, który tryb jest obecnie aktywny na piecu."""
         data = self.coordinator.data
-        if data and "zima_lato_state" in data:
-            return "Lato" if str(data["zima_lato_state"]) == "1" else "Zima"
+        if data and "zima_lato" in data:
+            return "Lato" if str(data["zima_lato"]) == "1" else "Zima"
         return None
 
     async def async_select_option(self, option: str) -> None:
         """Wysyła komendę zmiany trybu na wybrany przez Ciebie."""
         wartosc = "1" if option == "Lato" else "0"
-        url = f"http://{self.coordinator.host}/setregister.cgi?zima_lato={wartosc}"
+        url = f"http://{self.coordinator.host}/setregister.cgi?device=0&zima_lato={wartosc}"
         auth = aiohttp.BasicAuth(self.coordinator.username, self.coordinator.password)
         
         try:

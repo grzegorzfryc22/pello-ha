@@ -1,6 +1,6 @@
+import asyncio
 import logging
 import aiohttp
-import async_timeout
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
@@ -57,7 +57,7 @@ class PelloDataUpdateCoordinator(DataUpdateCoordinator):
         
         try:
             session = async_get_clientsession(self.hass)
-            async with async_timeout.timeout(10):
+            async with asyncio.timeout(10):
                 async with session.get(url, auth=auth) as response:
                     response.raise_for_status()
                     text_data = await response.text()
@@ -72,6 +72,12 @@ class PelloDataUpdateCoordinator(DataUpdateCoordinator):
                             parsed_data[key] = val
                             
                     return parsed_data
-                    
+
+        except asyncio.TimeoutError as err:
+            raise UpdateFailed(f"Timeout połączenia z piecem Pello: {err}") from err
+        except aiohttp.ClientResponseError as err:
+            raise UpdateFailed(f"Błąd HTTP {err.status} od pieca Pello: {err}") from err
+        except aiohttp.ClientError as err:
+            raise UpdateFailed(f"Błąd komunikacji z piecem Pello: {err}") from err
         except Exception as err:
-            raise UpdateFailed(f"Błąd komunikacji z piecem Pello: {err}")
+            raise UpdateFailed(f"Nieoczekiwany błąd pieca Pello: {err}") from err

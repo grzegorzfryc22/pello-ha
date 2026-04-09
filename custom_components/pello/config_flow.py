@@ -1,6 +1,6 @@
+import asyncio
 import logging
 import aiohttp
-import async_timeout
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -54,7 +54,7 @@ class PelloConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         
         try:
             session = async_get_clientsession(self.hass)
-            async with async_timeout.timeout(10):
+            async with asyncio.timeout(10):
                 async with session.get(url, auth=auth) as response:
                     return response.status == 200
         except Exception as e:

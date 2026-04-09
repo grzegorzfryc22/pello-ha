@@ -10,6 +10,12 @@
           "scan_interval": "Częstotliwość odświeżania (sekundy)"
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Nie można połączyć się ze sterownikiem. Sprawdź adres IP i dane logowania."
+    },
+    "abort": {
+      "already_configured": "Ten sterownik jest już skonfigurowany."
     }
   }
 }
