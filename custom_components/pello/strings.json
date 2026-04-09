@@ -1,0 +1,15 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Konfiguracja Pieca Pello",
+        "data": {
+          "host": "Adres IP sterownika",
+          "username": "Użytkownik (opcjonalnie)",
+          "password": "Hasło (opcjonalnie)",
+          "scan_interval": "Częstotliwość odświeżania (sekundy)"
+        }
+      }
+    }
+  }
+}
