@@ -1,5 +1,5 @@
 # Pello HA Integration
-Integracja dla sterowników kotłów pelletowych **Pello v3.5** (esterownik.pl / Bero) dla Home Assistant.
+Integracja dla sterowników kotłów pelletowych **Pello v3.5** (esterownik.pl) dla Home Assistant.
 
 ## Funkcje
 - 📊 Odczyt wszystkich parametrów temperatury (zewnętrzna, spaliny, kocioł, CWU, powrót).
@@ -17,4 +17,4 @@ Integracja dla sterowników kotłów pelletowych **Pello v3.5** (esterownik.pl /
 6. Zrestartuj Home Assistant.
 
 ## Konfiguracja
-Po restarcie przejdź do **Ustawienia -> Urządzenia oraz usługi** i kliknij **Dodaj integrację**. Wyszukaj "Pello" i podaj adres IP swojego sterownika.
+Po restarcie przejdź do **Ustawienia -> Urządzenia oraz usługi** i kliknij **Dodaj integrację**. Wyszukaj "Pello" i podaj adres IP swojego sterownika. 
