@@ -1,7 +1,7 @@
 {
   "domain": "pello",
   "name": "Piec Pello 3.5",
-  "version": "1.0.2",
+  "version": "1.0.1",
   "documentation": "https://github.com/grzegorzfryc22/pello-ha",
   "issue_tracker": "https://github.com/grzegorzfryc22/pello-ha/issues",
   "dependencies": [],
