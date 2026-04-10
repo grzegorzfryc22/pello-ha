@@ -10,7 +10,7 @@ SENSORS = (
     ("tsp_value", "Temperatura spalin", UnitOfTemperature.CELSIUS, "temperature", "mdi:fire", None),
     ("tkot_value", "Temperatura kotła", UnitOfTemperature.CELSIUS, "temperature", "mdi:heating-coil", None),
     ("tcwu_value", "Temperatura CWU", UnitOfTemperature.CELSIUS, "temperature", "mdi:water-boiler", None),
-    ("twew_value", "Temperatura sypialnia", UnitOfTemperature.CELSIUS, "temperature", "mdi:home-thermometer", None),
+    ("twew_value", "Temperatura CO 1", UnitOfTemperature.CELSIUS, "temperature", "mdi:home-thermometer", None),
     ("tpow_value", "Temperatura powrotu", UnitOfTemperature.CELSIUS, "temperature", "mdi:thermometer-chevron-down", None),
     ("kot_tzad", "Zadana temp. kotła", UnitOfTemperature.CELSIUS, "temperature", "mdi:target", None),
     ("cwu_tzad", "Zadana temp. CWU", UnitOfTemperature.CELSIUS, "temperature", "mdi:water-thermometer", None),
@@ -28,8 +28,8 @@ SENSORS = (
     ("out_zaw4d", "Stan zaworu 4D", None, None, "mdi:pipe-valve", EntityCategory.DIAGNOSTIC),
     ("pl_flame", "Wartość płomienia", PERCENTAGE, None, "mdi:fire-circle", EntityCategory.DIAGNOSTIC),
     
-    # Zmieniono klasę urządzenia na "timestamp", aby HA poprawnie formatował czas
-    ("next_fuel_time", "Data następnego zasypu", None, "timestamp", "mdi:calendar-clock", EntityCategory.DIAGNOSTIC),
+    # Zwraca konkretną datę jako tekst np. "15-04-2025 14:30"
+    ("next_fuel_time", "Data następnego zasypu", None, None, "mdi:calendar-clock", EntityCategory.DIAGNOSTIC),
     
     ("pod_run_time", "Czas pracy podajnika", UnitOfTime.SECONDS, None, "mdi:timer-outline", EntityCategory.DIAGNOSTIC),
     ("pl_calib_time", "Czas kalibracji", UnitOfTime.SECONDS, None, "mdi:timer-cog-outline", EntityCategory.DIAGNOSTIC),
@@ -128,8 +128,11 @@ class PelloSensor(CoordinatorEntity, SensorEntity):
                 # 6. Konwersja czasu UNIX na czytelną datę (Data zasypu)
                 if self._key == "next_fuel_time":
                     try:
-                        return datetime.datetime.fromtimestamp(float(val), tz=datetime.timezone.utc)
-                    except ValueError:
+                        dt = datetime.datetime.fromtimestamp(
+                            float(val), tz=datetime.timezone.utc
+                        ).astimezone()
+                        return dt.strftime("%d-%m-%Y %H:%M")
+                    except (ValueError, TypeError):
                         return None
 
                 # 7. Reszta sensorów — liczby całkowite bez .0, reszta 1 miejsce po przecinku
