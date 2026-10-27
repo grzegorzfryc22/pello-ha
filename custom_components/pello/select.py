@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from homeassistant.components.select import SelectEntity
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -22,6 +23,7 @@ class PelloSelectDef:
     unique_suffix: str | None = None
     icon: str | None = None
     enabled: bool = True
+    category: EntityCategory | None = None
 
 
 SELECTS: tuple[PelloSelectDef, ...] = (
@@ -44,6 +46,32 @@ SELECTS: tuple[PelloSelectDef, ...] = (
             "4": "+2 godziny",
         },
         icon="mdi:water-boiler",
+    ),
+    # Ochrona powrotu: czym sterownik podnosi temperaturę powrotu do kotła.
+    # Przy "Pompa CWU" w trybie Lato pompa CWU pracuje także przy zatrzymanym
+    # palniku i wychładza bojler — stąd możliwość wyłączenia z HA.
+    PelloSelectDef(
+        key="ochr_pow",
+        name="Ochrona powrotu",
+        options={
+            "0": "Pompa mieszająca",
+            "1": "Pompa CWU",
+            "2": "Zawór 4D",
+            "3": "Wyłączona",
+        },
+        icon="mdi:shield-sync-outline",
+        category=EntityCategory.CONFIG,
+    ),
+    PelloSelectDef(
+        key="tryb_ochr_pow",
+        name="Tryb aktywacji ochrony powrotu",
+        options={
+            "0": "Pompy CO i palnik",
+            "1": "Tylko pompy CO",
+            "2": "Tylko palnik",
+        },
+        icon="mdi:shield-cog-outline",
+        category=EntityCategory.CONFIG,
     ),
     # UWAGA: tryb ręczny zatrzymuje palnik i całe sterowanie (pompy, zawór, podajnik).
     # Dlatego encja jest domyślnie wyłączona — trzeba ją świadomie włączyć.
@@ -78,6 +106,7 @@ class PelloSelect(PelloEntity, SelectEntity):
         self._attr_options = list(definition.options.values())
         self._attr_icon = definition.icon
         self._attr_entity_registry_enabled_default = definition.enabled
+        self._attr_entity_category = definition.category
 
     @property
     def current_option(self) -> str | None:
