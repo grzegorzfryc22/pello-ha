@@ -117,7 +117,7 @@ SENSORS: tuple[PelloSensorDef, ...] = (
     PelloSensorDef(
         key="time_to_empty",
         name="Czas do braku paliwa",
-        unit=UnitOfTime.HOURS,
+        unit=UnitOfTime.MINUTES,
         device_class=SensorDeviceClass.DURATION,
         icon="mdi:timer-sand-empty",
     ),
