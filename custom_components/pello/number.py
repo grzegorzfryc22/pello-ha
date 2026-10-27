@@ -38,6 +38,15 @@ NUMBERS: tuple[PelloNumberDef, ...] = (
         icon="mdi:pipe-valve",
     ),
     PelloNumberDef(
+        key="tpow_min",
+        name="Minimalna temperatura powrotu",
+        minimum=35,
+        maximum=60,
+        icon="mdi:thermometer-chevron-down",
+        mode=NumberMode.BOX,
+        category=EntityCategory.CONFIG,
+    ),
+    PelloNumberDef(
         key="ob1_pok_lo",
         name="Temperatura pokojowa niska",
         minimum=5,

@@ -20,6 +20,8 @@ Działa lokalnie, bez chmury: odczyt przez `syncvalues.cgi`, zapis przez `setreg
 - 🌡️ Temperatura zadana: **CWU** (20–60 °C), **kotła CO** (42–80 °C), **za zaworem 4D** (20–80 °C).
 - 🏠 Temperatury pokojowe obiegu 1: niska / normalna / komfortowa (5–35 °C, co 0,1 °C).
 - 🌦️ Regulator pogodowy kotła i obiegu za zaworem (włącz/wyłącz).
+- 🛡️ **Ochrona powrotu** (pompa mieszająca / pompa CWU / zawór 4D / wyłączona), **tryb aktywacji
+  ochrony powrotu** i **minimalna temperatura powrotu** (35–60 °C) — encje konfiguracyjne, patrz niżej.
 - 🔕 Przycisk **Kasuj alarmy**.
 - ⛽ Akcja `pello.add_fuel` — rejestracja zasypu (1–700 kg).
 - ⚙️ Tryb **Automatyczny / Ręczny** — domyślnie wyłączony, patrz niżej.
@@ -33,6 +35,14 @@ Tryb ręczny **zatrzymuje palnik**, a sterownik przestaje sterować pompami, zaw
 dom i CWU przestają być grzane. Dlatego encja „Tryb sterowania (Automatyczny / Ręczny)” jest
 domyślnie wyłączona. Włączysz ją w **Ustawienia → Urządzenia → Piec Pello 3.5 → encje**.
 Nie używaj jej w automatyzacjach bez zabezpieczeń.
+
+### Ochrona powrotu w trybie Lato
+
+Gdy ochrona powrotu jest realizowana **pompą CWU**, w trybie Lato sterownik uruchamia tę pompę
+także przy zatrzymanym palniku (status „Stop”), jeśli powrót spadnie poniżej minimalnej
+temperatury powrotu. Zimny kocioł nie ma wtedy czym ogrzać powrotu, więc pompa pracuje ciągle
+i wychładza bojler CWU. Encja „Ochrona powrotu” pozwala np. automatyzacją wyłączać ochronę
+przy przejściu na Lato i przywracać ją przy przejściu na Zimę.
 
 ### Regulator pogodowy a temperatura za zaworem
 
