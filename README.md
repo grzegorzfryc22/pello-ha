@@ -53,22 +53,6 @@ Po restarcie przejdź do **Ustawienia → Urządzenia oraz usługi → Dodaj int
 i podaj adres IP sterownika oraz login i hasło do jego strony WWW (zwykle `root`).
 Częstotliwość odświeżania zmienisz później w **Konfiguruj** przy integracji.
 
-## Akcja: rejestracja zasypu
-
-```yaml
-action: pello.add_fuel
-data:
-  amount: 60
-```
-
-Sterownik traktuje zasobnik jako pełny i od nowa liczy prognozę zużycia.
-
-## Bezpieczeństwo
-
-`syncvalues.cgi` zwraca dane logowania sterownika (pola `auth_*`, zakodowane Base64 — to nie jest
-szyfrowanie). Integracja je odrzuca. **Nie publikuj** pełnej zawartości `syncvalues.cgi`
-(np. na forach) — usuń najpierw pola `auth_root`, `auth_admin`, `auth_user`.
-
 ## Aktualizacja z wersji 1.0.x
 - Istniejące encje zachowują identyfikatory (`entity_id`) i historię.
 - Nazwy wyświetlane mają teraz prefiks urządzenia („Piec Pello 3.5 …”), zgodnie ze standardem HA.
