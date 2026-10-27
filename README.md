@@ -1,15 +1,44 @@
 # Pello HA Integration
-Integracja dla sterowników kotłów pelletowych **Pello v3.5** (esterownik.pl) dla Home Assistant.
+
+Integracja Home Assistant dla sterowników kotłów pelletowych **Pello v3.5** (esterownik.pl).
+Działa lokalnie, bez chmury: odczyt przez `syncvalues.cgi`, zapis przez `setregister.cgi`.
 
 ## Funkcje
-- 📊 Odczyt wszystkich parametrów temperatury (zewnętrzna, spaliny, kocioł, CWU, powrót, CO1).
-- 📉 Monitorowanie poziomu paliwa i statystyk spalania.
-- ⚡ Podgląd stanu pracy (Stop, Praca, Rozpalanie, Wygaszanie, Czyszczenie).
-- ❄️/☀️ Sterowanie trybem **Zima/Lato** bezpośrednio z Home Assistant.
-- 🌡️ Ustawianie **temperatury zadanej CWU** (suwak 10–60°C).
-- 🌡️ Ustawianie **temperatury zadanej kotła CO** (suwak 30–80°C).
-- 🚨 Obsługa alarmów (w tym STB Termik).
-- 📅 Podgląd daty następnego zasypu w formacie DD-MM-YYYY HH:MM.
+
+**Odczyt**
+- 🌡️ Temperatury: zewnętrzna, spaliny, kocioł, CWU, powrót, pokojowa (obieg 1), **za zaworem 4D (T1)**, moduł palnika.
+- 🎯 Nastawy aktywne (wyliczone przez sterownik): kocioł, CWU, za zaworem, temperatura pokojowa.
+- 📉 Paliwo: poziom, spalanie (kg/h), czas do braku paliwa, **ostatni zasyp (kg i data)**, data następnego zasypu.
+- ⚡ Stan pracy: status kotła (Stop / Rozpalanie / Praca / Wygaszanie / Czyszczenie), tryb (Automatyczny / Ręczny / Alarmowy), zawór 4D (stan i pozycja), pompy, podajnik, dmuchawa (% i obroty).
+- 🚨 Alarmy: rozpalanie, zapłon podajnika, temperatura kotła/podajnika, STB/termik, zasobnik, otwarty zasobnik, obieg CO1, czujnik za zaworem, moduł palnika.
+- Wersja oprogramowania i numer seryjny w informacjach o urządzeniu.
+- Temperatury, moc i spalanie mają `state_class`, więc trafiają do statystyk długoterminowych.
+
+**Sterowanie**
+- ❄️/☀️ Tryb **Zima / Lato / Auto-lato**.
+- 🚿 Tryb **CWU**: wyłączona, harmonogram, włączona, +1 h, +2 h.
+- 🌡️ Temperatura zadana: **CWU** (20–60 °C), **kotła CO** (55–80 °C), **za zaworem 4D** (20–80 °C).
+- 🏠 Temperatury pokojowe obiegu 1: niska / normalna / komfortowa (5–35 °C, co 0,1 °C).
+- 🌦️ Regulator pogodowy kotła i obiegu za zaworem (włącz/wyłącz).
+- 🔕 Przycisk **Kasuj alarmy**.
+- ⛽ Akcja `pello.add_fuel` — rejestracja zasypu (1–200 kg).
+- ⚙️ Tryb **Automatyczny / Ręczny** — domyślnie wyłączony, patrz niżej.
+
+Zakresy nastaw są zgodne ze słownikiem rejestrów sterownika. Wartość spoza zakresu sterownik odrzuci,
+a Home Assistant pokaże błąd (nie „udaje”, że zapis się udał).
+
+### Tryb ręczny — uwaga
+
+Tryb ręczny **zatrzymuje palnik**, a sterownik przestaje sterować pompami, zaworem i podajnikiem —
+dom i CWU przestają być grzane. Dlatego encja „Tryb sterowania (Automatyczny / Ręczny)” jest
+domyślnie wyłączona. Włączysz ją w **Ustawienia → Urządzenia → Piec Pello 3.5 → encje**.
+Nie używaj jej w automatyzacjach bez zabezpieczeń.
+
+### Regulator pogodowy a temperatura za zaworem
+
+Gdy regulator pogodowy obiegu jest włączony, sterownik sam wylicza temperaturę za zaworem z krzywej
+grzewczej. Zmiana „Zadanej temperatury za zaworem” ma wtedy ograniczony wpływ — rzeczywistą,
+wyliczoną wartość pokazuje sensor „Aktywna zadana temp. za zaworem”.
 
 ## Instalacja przez HACS
 1. Otwórz HACS w Home Assistant.
@@ -20,4 +49,28 @@ Integracja dla sterowników kotłów pelletowych **Pello v3.5** (esterownik.pl) 
 6. Zrestartuj Home Assistant.
 
 ## Konfiguracja
-Po restarcie przejdź do **Ustawienia -> Urządzenia oraz usługi** i kliknij **Dodaj integrację**. Wyszukaj "Pello" i podaj adres IP swojego sterownika.
+Po restarcie przejdź do **Ustawienia → Urządzenia oraz usługi → Dodaj integrację**, wyszukaj „Pello”
+i podaj adres IP sterownika oraz login i hasło do jego strony WWW (zwykle `root`).
+Częstotliwość odświeżania zmienisz później w **Konfiguruj** przy integracji.
+
+## Akcja: rejestracja zasypu
+
+```yaml
+action: pello.add_fuel
+data:
+  amount: 60
+```
+
+Sterownik traktuje zasobnik jako pełny i od nowa liczy prognozę zużycia.
+
+## Bezpieczeństwo
+
+`syncvalues.cgi` zwraca dane logowania sterownika (pola `auth_*`, zakodowane Base64 — to nie jest
+szyfrowanie). Integracja je odrzuca. **Nie publikuj** pełnej zawartości `syncvalues.cgi`
+(np. na forach) — usuń najpierw pola `auth_root`, `auth_admin`, `auth_user`.
+
+## Aktualizacja z wersji 1.0.x
+- Istniejące encje zachowują identyfikatory (`entity_id`) i historię.
+- Nazwy wyświetlane mają teraz prefiks urządzenia („Piec Pello 3.5 …”), zgodnie ze standardem HA.
+- Sensor „Temperatura CO 1” nazywa się teraz „Temperatura pokojowa” — to czujnik pokojowy obiegu 1.
+- Zakres zadanej temperatury kotła to 55–80 °C (taki przyjmuje sterownik).

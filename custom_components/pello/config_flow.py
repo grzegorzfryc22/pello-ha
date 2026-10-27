@@ -1,62 +1,156 @@
-import asyncio
+"""Konfiguracja integracji Pello z poziomu UI."""
+
+from __future__ import annotations
+
 import logging
+from collections.abc import Mapping
+from typing import Any
+
 import aiohttp
 import voluptuous as vol
-
-from homeassistant import config_entries
-from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN, DEFAULT_SCAN_INTERVAL
+from .const import (
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    MIN_SCAN_INTERVAL,
+    PATH_VALUES,
+    REQUEST_TIMEOUT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-DATA_SCHEMA = vol.Schema({
-    vol.Required(CONF_HOST): str,
-    vol.Optional(CONF_USERNAME, default="root"): str,
-    vol.Optional(CONF_PASSWORD): str,
-    vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
-})
+SCAN_INTERVAL_VALIDATOR = vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL, max=3600))
 
-class PelloConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Obsługa konfiguracji z poziomu interfejsu HA."""
+USER_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_HOST): str,
+        vol.Optional(CONF_USERNAME, default="root"): str,
+        vol.Optional(CONF_PASSWORD, default=""): str,
+        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): SCAN_INTERVAL_VALIDATOR,
+    }
+)
+
+
+async def _test_connection(hass, host: str, username: str, password: str) -> str | None:
+    """Zwraca kod błędu albo None, gdy sterownik odpowiada poprawnie."""
+    auth = aiohttp.BasicAuth(username, password or "") if username else None
+    session = async_get_clientsession(hass)
+    try:
+        async with session.get(
+            f"http://{host}/{PATH_VALUES}",
+            auth=auth,
+            timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
+        ) as response:
+            if response.status in (401, 403):
+                return "invalid_auth"
+            if response.status != 200:
+                return "cannot_connect"
+            text = await response.text(errors="replace")
+    except (aiohttp.ClientError, TimeoutError, ValueError) as err:
+        _LOGGER.debug("Pello: test połączenia nieudany: %s", err)
+        return "cannot_connect"
+    if "tkot_value" not in text:
+        return "not_pello"
+    return None
+
+
+class PelloConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Dodawanie sterownika Pello."""
+
     VERSION = 1
 
-    async def async_step_user(self, user_input=None):
-        """Krok wywoływany przez użytkownika z UI."""
-        errors = {}
-
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            valid = await self._test_connection(
-                user_input[CONF_HOST],
-                user_input.get(CONF_USERNAME),
-                user_input.get(CONF_PASSWORD)
-            )
+            host = user_input[CONF_HOST].strip()
+            await self.async_set_unique_id(host)
+            self._abort_if_unique_id_configured()
+            self._async_abort_entries_match({CONF_HOST: host})
 
-            if valid:
+            error = await _test_connection(
+                self.hass,
+                host,
+                user_input.get(CONF_USERNAME, ""),
+                user_input.get(CONF_PASSWORD, ""),
+            )
+            if error is None:
                 return self.async_create_entry(
-                    title=f"Piec Pello ({user_input[CONF_HOST]})", 
-                    data=user_input
+                    title=f"Piec Pello ({host})",
+                    data={**user_input, CONF_HOST: host},
                 )
-            else:
-                errors["base"] = "cannot_connect"
+            errors["base"] = error
 
         return self.async_show_form(
             step_id="user",
-            data_schema=DATA_SCHEMA,
-            errors=errors
+            data_schema=self.add_suggested_values_to_schema(USER_SCHEMA, user_input),
+            errors=errors,
         )
 
-    async def _test_connection(self, host, username, password):
-        """Sprawdza, czy sterownik odpowiada na podane dane logowania."""
-        url = f"http://{host}/syncvalues.cgi"
-        auth = aiohttp.BasicAuth(username, password) if username and password else None
-        
-        try:
-            session = async_get_clientsession(self.hass)
-            async with asyncio.timeout(10):
-                async with session.get(url, auth=auth) as response:
-                    return response.status == 200
-        except Exception as e:
-            _LOGGER.error(f"Pello test connection error: {e}")
-            return False
+    async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        entry = self._get_reauth_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            error = await _test_connection(
+                self.hass,
+                entry.data[CONF_HOST],
+                user_input.get(CONF_USERNAME, ""),
+                user_input.get(CONF_PASSWORD, ""),
+            )
+            if error is None:
+                return self.async_update_reload_and_abort(entry, data_updates=user_input)
+            errors["base"] = error
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "root")
+                    ): str,
+                    vol.Optional(CONF_PASSWORD, default=""): str,
+                }
+            ),
+            errors=errors,
+        )
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> PelloOptionsFlow:
+        return PelloOptionsFlow()
+
+
+class PelloOptionsFlow(OptionsFlow):
+    """Opcje: interwał odświeżania."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        current = self.config_entry.options.get(
+            CONF_SCAN_INTERVAL,
+            self.config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+        )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {vol.Required(CONF_SCAN_INTERVAL, default=current): SCAN_INTERVAL_VALIDATOR}
+            ),
+        )

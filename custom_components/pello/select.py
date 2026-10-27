@@ -1,58 +1,91 @@
-import logging
-import aiohttp
+"""Tryby pracy sterownika Pello."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
 from homeassistant.components.select import SelectEntity
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from .const import DOMAIN
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-_LOGGER = logging.getLogger(__name__)
+from .const import UNIQUE_ID_PREFIX
+from .coordinator import PelloConfigEntry, PelloCoordinator
+from .entity import PelloEntity
 
-async def async_setup_entry(hass, config_entry, async_add_entities):
-    """Konfiguracja encji wyboru na podstawie Config Flow."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]
-    async_add_entities([PelloTrybZimaLatoSelect(coordinator)])
 
-class PelloTrybZimaLatoSelect(CoordinatorEntity, SelectEntity):
-    """Encja pozwalająca na przełączanie trybu Zima/Lato."""
-    
-    def __init__(self, coordinator):
-        super().__init__(coordinator)
-        self._attr_name = "Tryb pracy (Zima / Lato)"
-        self._attr_unique_id = "pello_35_tryb_zima_lato"
-        self._attr_icon = "mdi:theme-light-dark"
-        # Definiujemy dwie dostępne opcje
-        self._attr_options = ["Zima", "Lato"]
-        
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, coordinator.host)},
-            "name": "Piec Pello 3.5",
-            "manufacturer": "esterownik.pl",
-            "model": "Pello v3.5",
-            "configuration_url": f"http://{coordinator.host}/",
-        }
+@dataclass(frozen=True, kw_only=True)
+class PelloSelectDef:
+    key: str  # rejestr zapisywany przez setregister.cgi
+    name: str
+    options: dict[str, str]  # wartość rejestru -> etykieta
+    state_key: str | None = None  # rejestr ze stanem, gdy inny niż zapisywany
+    unique_suffix: str | None = None
+    icon: str | None = None
+    enabled: bool = True
+
+
+SELECTS: tuple[PelloSelectDef, ...] = (
+    PelloSelectDef(
+        key="zima_lato",
+        name="Tryb pracy (Zima / Lato)",
+        options={"0": "Zima", "1": "Lato", "2": "Auto-lato"},
+        # Zachowany unique_id z wersji 1.0.x.
+        unique_suffix="tryb_zima_lato",
+        icon="mdi:theme-light-dark",
+    ),
+    PelloSelectDef(
+        key="cwu_state",
+        name="Tryb CWU",
+        options={
+            "0": "Wyłączona",
+            "1": "Harmonogram",
+            "2": "Włączona",
+            "3": "+1 godzina",
+            "4": "+2 godziny",
+        },
+        icon="mdi:water-boiler",
+    ),
+    # UWAGA: tryb ręczny zatrzymuje palnik i całe sterowanie (pompy, zawór, podajnik).
+    # Dlatego encja jest domyślnie wyłączona — trzeba ją świadomie włączyć.
+    PelloSelectDef(
+        key="tryb_auto",
+        name="Tryb sterowania (Automatyczny / Ręczny)",
+        options={"1": "Automatyczny", "0": "Ręczny"},
+        state_key="tryb_auto_state",
+        icon="mdi:state-machine",
+        enabled=False,
+    ),
+)
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: PelloConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
+    coordinator = entry.runtime_data
+    async_add_entities(PelloSelect(coordinator, definition) for definition in SELECTS)
+
+
+class PelloSelect(PelloEntity, SelectEntity):
+    """Wybór trybu zapisywany przez setregister.cgi."""
+
+    def __init__(self, coordinator: PelloCoordinator, definition: PelloSelectDef) -> None:
+        super().__init__(coordinator, definition.key, definition.name)
+        self._def = definition
+        if definition.unique_suffix:
+            self._attr_unique_id = f"{UNIQUE_ID_PREFIX}_{definition.unique_suffix}"
+        self._attr_options = list(definition.options.values())
+        self._attr_icon = definition.icon
+        self._attr_entity_registry_enabled_default = definition.enabled
 
     @property
-    def current_option(self):
-        """Zwraca, który tryb jest obecnie aktywny na piecu."""
-        data = self.coordinator.data
-        if data and "zima_lato" in data:
-            return "Lato" if str(data["zima_lato"]) == "1" else "Zima"
-        return None
+    def current_option(self) -> str | None:
+        raw = self._raw(self._def.state_key or self._def.key)
+        if raw is None:
+            return None
+        return self._def.options.get(raw)
 
     async def async_select_option(self, option: str) -> None:
-        """Wysyła komendę zmiany trybu na wybrany przez Ciebie."""
-        wartosc = "1" if option == "Lato" else "0"
-        url = f"http://{self.coordinator.host}/setregister.cgi?device=0&zima_lato={wartosc}"
-        auth = aiohttp.BasicAuth(self.coordinator.username, self.coordinator.password)
-        
-        try:
-            session = async_get_clientsession(self.hass)
-            async with session.get(url, auth=auth) as response:
-                response.raise_for_status()
-                _LOGGER.info(f"Pomyślnie zmieniono tryb na: {option}")
-                
-            # Wymuszenie odświeżenia danych, by przełącznik od razu przeskoczył w aplikacji
-            await self.coordinator.async_request_refresh()
-            
-        except Exception as err:
-            _LOGGER.error(f"Błąd podczas zmiany trybu Zima/Lato: {err}")
+        value = next(raw for raw, label in self._def.options.items() if label == option)
+        await self.coordinator.async_write(self._def.key, value)

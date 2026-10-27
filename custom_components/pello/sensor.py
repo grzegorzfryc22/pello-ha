@@ -1,144 +1,309 @@
-import datetime
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.const import UnitOfTemperature, UnitOfMass, UnitOfTime, PERCENTAGE, EntityCategory
-from .const import DOMAIN
+"""Sensory sterownika Pello."""
 
-# Lista: (klucz, nazwa, jednostka, klasa_urzadzenia, ikona, kategoria)
-SENSORS = (
-    ("tzew_value", "Temperatura zewnętrzna", UnitOfTemperature.CELSIUS, "temperature", "mdi:thermometer", None),
-    ("tsp_value", "Temperatura spalin", UnitOfTemperature.CELSIUS, "temperature", "mdi:fire", None),
-    ("tkot_value", "Temperatura kotła", UnitOfTemperature.CELSIUS, "temperature", "mdi:heating-coil", None),
-    ("tcwu_value", "Temperatura CWU", UnitOfTemperature.CELSIUS, "temperature", "mdi:water-boiler", None),
-    ("twew_value", "Temperatura CO 1", UnitOfTemperature.CELSIUS, "temperature", "mdi:home-thermometer", None),
-    ("tpow_value", "Temperatura powrotu", UnitOfTemperature.CELSIUS, "temperature", "mdi:thermometer-chevron-down", None),
-    ("kot_tzad", "Zadana temp. kotła", UnitOfTemperature.CELSIUS, "temperature", "mdi:target", None),
-    ("cwu_tzad", "Zadana temp. CWU", UnitOfTemperature.CELSIUS, "temperature", "mdi:water-thermometer", None),
-    ("fuel_level", "Poziom paliwa", PERCENTAGE, None, "mdi:barrel", None),
-    ("pl_power_kw", "Moc palnika", "kW", "power", "mdi:lightning-bolt", None),
-    ("time_to_empty", "Czas do braku paliwa", UnitOfTime.HOURS, None, "mdi:hourglass-empty", None),
-    ("pl_fuel_flow", "Spalanie paliwa", "kg/h", None, "mdi:weight", None),
+from __future__ import annotations
 
-    ("tryb_auto_state", "Tryb pieca", None, None, "mdi:state-machine", EntityCategory.DIAGNOSTIC),
-    ("pl_status", "Status kotła", None, None, "mdi:information-outline", EntityCategory.DIAGNOSTIC),
-    ("out_pomp1", "Pompa CO", None, None, "mdi:pump", EntityCategory.DIAGNOSTIC),
-    ("out_cwu", "Pompa CWU", None, None, "mdi:water-pump", EntityCategory.DIAGNOSTIC),
-    ("out_dm", "Stan dmuchawy", None, None, "mdi:fan", EntityCategory.DIAGNOSTIC),
-    ("act_dm_speed", "Prędkość dmuchawy", PERCENTAGE, None, "mdi:fan-speed-1", EntityCategory.DIAGNOSTIC),
-    ("out_zaw4d", "Stan zaworu 4D", None, None, "mdi:pipe-valve", EntityCategory.DIAGNOSTIC),
-    ("pl_flame", "Wartość płomienia", PERCENTAGE, None, "mdi:fire-circle", EntityCategory.DIAGNOSTIC),
-    
-    # Zwraca konkretną datę jako tekst np. "15-04-2025 14:30"
-    ("next_fuel_time", "Data następnego zasypu", None, None, "mdi:calendar-clock", EntityCategory.DIAGNOSTIC),
-    
-    ("pod_run_time", "Czas pracy podajnika", UnitOfTime.SECONDS, None, "mdi:timer-outline", EntityCategory.DIAGNOSTIC),
-    ("pl_calib_time", "Czas kalibracji", UnitOfTime.SECONDS, None, "mdi:timer-cog-outline", EntityCategory.DIAGNOSTIC),
-    ("pl_calib_perf", "Wartość kalibracji", UnitOfMass.GRAMS, None, "mdi:weight-gram", EntityCategory.DIAGNOSTIC),
-    
-    ("alarm_rozp", "Alarm rozpalanie", None, None, "mdi:alert", EntityCategory.DIAGNOSTIC),
-    ("alarm_pod_zaplon", "Alarm podajnik zapłon", None, None, "mdi:alert-fire", EntityCategory.DIAGNOSTIC),
-    ("alarm_tkot_90", "Alarm temp kotła", None, None, "mdi:alert-thermometer", EntityCategory.DIAGNOSTIC),
-    ("alarm_tpod_hi", "Alarm temp podajnik", None, None, "mdi:alert-thermometer", EntityCategory.DIAGNOSTIC),
-    ("alarm_termik", "Alarm STB (Termik)", None, None, "mdi:alert-octagon", EntityCategory.DIAGNOSTIC),
-    ("alarm_zasobnik", "Alarm zasobnika", None, None, "mdi:alert-circle", EntityCategory.DIAGNOSTIC),
+from dataclasses import dataclass
+from datetime import UTC, datetime
+
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
+from homeassistant.const import (
+    PERCENTAGE,
+    REVOLUTIONS_PER_MINUTE,
+    EntityCategory,
+    UnitOfMass,
+    UnitOfPower,
+    UnitOfTemperature,
+    UnitOfTime,
+)
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+
+from .coordinator import PelloConfigEntry, PelloCoordinator
+from .entity import PelloEntity
+
+ON_OFF = {"0": "Wył.", "1": "Wł."}
+
+VALUE_MAPS: dict[str, dict[str, str]] = {
+    "pl_status": {
+        "0": "Stop",
+        "1": "Rozpalanie",
+        "2": "Praca",
+        "3": "Wygaszanie",
+        "4": "Czyszczenie",
+    },
+    "tryb_auto_state": {"0": "Ręczny", "1": "Automatyczny", "2": "Alarmowy"},
+    "out_zaw4d": {"0": "Wyłączony", "1": "Otwierany", "2": "Zamykany"},
+}
+
+
+@dataclass(frozen=True, kw_only=True)
+class PelloSensorDef:
+    key: str
+    name: str
+    unit: str | None = None
+    device_class: SensorDeviceClass | None = None
+    state_class: SensorStateClass | None = None
+    icon: str | None = None
+    category: EntityCategory | None = None
+    precision: int | None = None
+    kind: str = "number"  # number | map | onoff | timestamp
+    enabled: bool = True
+
+
+def _temp(key: str, name: str, icon: str, **kw) -> PelloSensorDef:
+    return PelloSensorDef(
+        key=key,
+        name=name,
+        unit=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon=icon,
+        precision=1,
+        **kw,
+    )
+
+
+def _setpoint(key: str, name: str, icon: str = "mdi:target") -> PelloSensorDef:
+    return _temp(key, name, icon, category=EntityCategory.DIAGNOSTIC)
+
+
+def _onoff(key: str, name: str, icon: str, enabled: bool = True) -> PelloSensorDef:
+    return PelloSensorDef(
+        key=key,
+        name=name,
+        icon=icon,
+        kind="onoff",
+        category=EntityCategory.DIAGNOSTIC,
+        enabled=enabled,
+    )
+
+
+SENSORS: tuple[PelloSensorDef, ...] = (
+    # Temperatury
+    _temp("tzew_value", "Temperatura zewnętrzna", "mdi:thermometer"),
+    _temp("tsp_value", "Temperatura spalin", "mdi:fire"),
+    _temp("tkot_value", "Temperatura kotła", "mdi:heating-coil"),
+    _temp("tcwu_value", "Temperatura CWU", "mdi:water-boiler"),
+    _temp("twew_value", "Temperatura pokojowa", "mdi:home-thermometer"),
+    _temp("tpow_value", "Temperatura powrotu", "mdi:thermometer-chevron-down"),
+    _temp("t1_value", "Temperatura za zaworem", "mdi:pipe-valve"),
+    # Nastawy (odczyt; zmiana przez encje number)
+    _setpoint("kot_tzad", "Zadana temp. kotła"),
+    _setpoint("cwu_tzad", "Zadana temp. CWU", "mdi:water-thermometer"),
+    _setpoint("kot_tact", "Aktywna zadana temp. kotła"),
+    _setpoint("cwu_tact", "Aktywna zadana temp. CWU", "mdi:water-thermometer"),
+    _setpoint("ob1_zaw4d_tzad", "Aktywna zadana temp. za zaworem", "mdi:pipe-valve"),
+    _setpoint("ob1_pok_tzad", "Zadana temp. pokojowa", "mdi:home-thermometer-outline"),
+    # Paliwo i palnik
+    PelloSensorDef(
+        key="fuel_level",
+        name="Poziom paliwa",
+        unit=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:barrel",
+    ),
+    PelloSensorDef(
+        key="pl_power_kw",
+        name="Moc palnika",
+        unit=UnitOfPower.KILO_WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:lightning-bolt",
+    ),
+    PelloSensorDef(
+        key="time_to_empty",
+        name="Czas do braku paliwa",
+        unit=UnitOfTime.HOURS,
+        device_class=SensorDeviceClass.DURATION,
+        icon="mdi:timer-sand-empty",
+    ),
+    PelloSensorDef(
+        key="pl_fuel_flow",
+        name="Spalanie paliwa",
+        unit="kg/h",
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:weight",
+        precision=2,
+    ),
+    PelloSensorDef(
+        key="add_fuel",
+        name="Ostatni zasyp",
+        unit=UnitOfMass.KILOGRAMS,
+        device_class=SensorDeviceClass.WEIGHT,
+        icon="mdi:basket-fill",
+    ),
+    PelloSensorDef(
+        key="add_fuel_time",
+        name="Data ostatniego zasypu",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:calendar-check",
+        kind="timestamp",
+    ),
+    PelloSensorDef(
+        key="next_fuel_time",
+        name="Data następnego zasypu",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:calendar-clock",
+        kind="timestamp",
+    ),
+    # Stany pracy
+    PelloSensorDef(
+        key="tryb_auto_state",
+        name="Tryb pieca",
+        icon="mdi:state-machine",
+        kind="map",
+        category=EntityCategory.DIAGNOSTIC,
+    ),
+    PelloSensorDef(
+        key="pl_status",
+        name="Status kotła",
+        icon="mdi:information-outline",
+        kind="map",
+        category=EntityCategory.DIAGNOSTIC,
+    ),
+    PelloSensorDef(
+        key="out_zaw4d",
+        name="Stan zaworu 4D",
+        icon="mdi:pipe-valve",
+        kind="map",
+        category=EntityCategory.DIAGNOSTIC,
+    ),
+    PelloSensorDef(
+        key="ob1_zaw4d_pos",
+        name="Pozycja zaworu 4D",
+        unit=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:valve",
+        category=EntityCategory.DIAGNOSTIC,
+    ),
+    # Wyjścia
+    _onoff("out_pomp1", "Pompa CO", "mdi:pump"),
+    _onoff("out_cwu", "Pompa CWU", "mdi:water-pump"),
+    _onoff("out_dm", "Stan dmuchawy", "mdi:fan"),
+    _onoff("out_pod", "Podajnik", "mdi:screw-machine-flat-top"),
+    _onoff("out_pomp2", "Pompa CO 2", "mdi:pump", enabled=False),
+    _onoff("out_miesz", "Pompa mieszacza", "mdi:pump", enabled=False),
+    _onoff("out_aux", "Wyjście AUX", "mdi:electric-switch", enabled=False),
+    PelloSensorDef(
+        key="act_dm_speed",
+        name="Prędkość dmuchawy",
+        unit=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:fan-speed-1",
+        category=EntityCategory.DIAGNOSTIC,
+    ),
+    PelloSensorDef(
+        key="mpl_dm_rpm",
+        name="Obroty dmuchawy",
+        unit=REVOLUTIONS_PER_MINUTE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:fan",
+        category=EntityCategory.DIAGNOSTIC,
+    ),
+    PelloSensorDef(
+        key="pl_flame",
+        name="Wartość płomienia",
+        unit=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:fire-circle",
+        category=EntityCategory.DIAGNOSTIC,
+    ),
+    _temp(
+        "mpl_temp",
+        "Temperatura modułu palnika",
+        "mdi:thermometer",
+        category=EntityCategory.DIAGNOSTIC,
+    ),
+    # Podajnik i kalibracja
+    PelloSensorDef(
+        key="pod_run_time",
+        name="Czas pracy podajnika",
+        unit=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        icon="mdi:timer-outline",
+        category=EntityCategory.DIAGNOSTIC,
+    ),
+    PelloSensorDef(
+        key="pl_calib_time",
+        name="Czas kalibracji",
+        unit=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        icon="mdi:timer-cog-outline",
+        category=EntityCategory.DIAGNOSTIC,
+    ),
+    PelloSensorDef(
+        key="pl_calib_perf",
+        name="Wartość kalibracji",
+        unit=UnitOfMass.GRAMS,
+        device_class=SensorDeviceClass.WEIGHT,
+        icon="mdi:weight-gram",
+        category=EntityCategory.DIAGNOSTIC,
+    ),
+    # Alarmy
+    _onoff("alarm_rozp", "Alarm rozpalanie", "mdi:alert"),
+    _onoff("alarm_pod_zaplon", "Alarm podajnik zapłon", "mdi:alert-fire"),
+    _onoff("alarm_tkot_90", "Alarm temp kotła", "mdi:alert-thermometer"),
+    _onoff("alarm_tpod_hi", "Alarm temp podajnik", "mdi:alert-thermometer"),
+    _onoff("alarm_termik", "Alarm STB (Termik)", "mdi:alert-octagon"),
+    _onoff("alarm_stb", "Alarm STB", "mdi:alert-octagon"),
+    _onoff("alarm_zasobnik", "Alarm zasobnika", "mdi:alert-circle"),
+    _onoff("alarm_otw_zasob", "Alarm otwarty zasobnik", "mdi:archive-alert"),
+    _onoff("alarm_tco1_hi", "Alarm temp. obiegu CO1", "mdi:alert-thermometer"),
+    _onoff("alarm_t1", "Alarm czujnika za zaworem", "mdi:alert-circle-outline"),
+    _onoff("mpl_alarm", "Alarm modułu palnika", "mdi:alert-circle"),
 )
 
-async def async_setup_entry(hass, config_entry, async_add_entities):
-    """Konfiguracja sensorów na podstawie Config Flow."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]
-    
-    async_add_entities([
-        PelloSensor(coordinator, key, name, unit, device_class, icon, category)
-        for key, name, unit, device_class, icon, category in SENSORS
-    ])
 
-class PelloSensor(CoordinatorEntity, SensorEntity):
-    """Reprezentacja pojedynczego sensora Pello."""
-    
-    def __init__(self, coordinator, key, name, unit, device_class, icon, category):
-        super().__init__(coordinator)
-        self._key = key
-        self._attr_name = name
-        self._attr_native_unit_of_measurement = unit
-        self._attr_device_class = device_class
-        self._attr_icon = icon
-        self._attr_entity_category = category
-        self._attr_unique_id = f"pello_35_{key}"
-        
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, coordinator.host)},
-            "name": "Piec Pello 3.5",
-            "manufacturer": "esterownik.pl",
-            "model": "Pello v3.5",
-            "configuration_url": f"http://{coordinator.host}/",
-        }
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: PelloConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
+    coordinator = entry.runtime_data
+    async_add_entities(PelloSensor(coordinator, definition) for definition in SENSORS)
+
+
+class PelloSensor(PelloEntity, SensorEntity):
+    """Pojedynczy odczyt ze sterownika."""
+
+    def __init__(self, coordinator: PelloCoordinator, definition: PelloSensorDef) -> None:
+        super().__init__(coordinator, definition.key, definition.name)
+        self._def = definition
+        self._attr_native_unit_of_measurement = definition.unit
+        self._attr_device_class = definition.device_class
+        self._attr_state_class = definition.state_class
+        self._attr_icon = definition.icon
+        self._attr_entity_category = definition.category
+        self._attr_suggested_display_precision = definition.precision
+        self._attr_entity_registry_enabled_default = definition.enabled
 
     @property
-    def native_value(self):
-        """Zwraca obecny stan sensora."""
-        data = self.coordinator.data
-        if data and self._key in data:
-            val = data[self._key]
-            if val is not None:
-                # 1. Tłumaczenie statusu pracy kotła
-                if self._key == "pl_status":
-                    status_map = {
-                        "0": "Stop",
-                        "1": "Rozpalanie",
-                        "2": "Praca",
-                        "3": "Wygaszanie",
-                        "4": "Czyszczenie"
-                    }
-                    return status_map.get(str(val), f"Nieznany ({val})")
+    def native_value(self) -> str | int | float | datetime | None:
+        raw = self._raw()
+        if raw is None:
+            return None
 
-                # 2. Tłumaczenie trybu pieca
-                if self._key == "tryb_auto_state":
-                    tryb_map = {
-                        "0": "Ręczny",
-                        "1": "Automatyczny",
-                        "2": "Alarmowy",
-                    }
-                    return tryb_map.get(str(val), f"Nieznany ({val})")
+        kind = self._def.kind
+        if kind == "map":
+            return VALUE_MAPS[self._key].get(raw, f"Nieznany ({raw})")
+        if kind == "onoff":
+            # Alarmy modułu palnika mogą zwracać kody inne niż 0/1.
+            return ON_OFF.get(raw, f"Wł. ({raw})")
+        if kind == "timestamp":
+            try:
+                seconds = float(raw)
+            except ValueError:
+                return None
+            if seconds <= 0:
+                return None
+            return datetime.fromtimestamp(seconds, tz=UTC)
 
-                # 3. Tłumaczenie zaworu 4D
-                if self._key == "out_zaw4d":
-                    zaw4d_map = {
-                        "0": "Wyłączony",
-                        "1": "Otwierany",
-                        "2": "Zamykany"
-                    }
-                    return zaw4d_map.get(str(val), f"Nieznany ({val})")
-
-                # 4. Tłumaczenie stanu pomp i dmuchawy
-                if self._key in ["out_pomp1", "out_cwu", "out_dm"]:
-                    stan_map = {
-                        "0": "Wył.",
-                        "1": "Wł."
-                    }
-                    return stan_map.get(str(val), f"Nieznany ({val})")
-
-                # 5. Tłumaczenie wszystkich Alarmów
-                if self._key.startswith("alarm_"):
-                    alarm_map = {
-                        "0": "Wył.",
-                        "1": "Wł."
-                    }
-                    return alarm_map.get(str(val), f"Nieznany ({val})")
-
-                # 6. Konwersja czasu UNIX na czytelną datę (Data zasypu)
-                if self._key == "next_fuel_time":
-                    try:
-                        dt = datetime.datetime.fromtimestamp(
-                            float(val), tz=datetime.timezone.utc
-                        ).astimezone()
-                        return dt.strftime("%d-%m-%Y %H:%M")
-                    except (ValueError, TypeError):
-                        return None
-
-                # 7. Reszta sensorów — liczby całkowite bez .0, reszta 1 miejsce po przecinku
-                try:
-                    f = float(val)
-                    return int(f) if f == int(f) else round(f, 1)
-                except ValueError:
-                    return val
-        return None
+        try:
+            value = float(raw)
+        except ValueError:
+            return raw
+        return int(value) if value.is_integer() else value

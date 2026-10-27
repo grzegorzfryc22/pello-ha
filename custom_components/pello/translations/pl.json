@@ -1,0 +1,59 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Konfiguracja pieca Pello",
+        "description": "Podaj adres IP sterownika Pello v3.5 w sieci lokalnej oraz dane logowania do jego strony WWW.",
+        "data": {
+          "host": "Adres IP sterownika",
+          "username": "Użytkownik",
+          "password": "Hasło",
+          "scan_interval": "Częstotliwość odświeżania (sekundy)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Ponowne logowanie do pieca Pello",
+        "description": "Sterownik odrzucił dane logowania. Podaj aktualny login i hasło.",
+        "data": {
+          "username": "Użytkownik",
+          "password": "Hasło"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nie można połączyć się ze sterownikiem. Sprawdź adres IP.",
+      "invalid_auth": "Niepoprawny login lub hasło.",
+      "not_pello": "Pod tym adresem odpowiada urządzenie, które nie wygląda na sterownik Pello."
+    },
+    "abort": {
+      "already_configured": "Ten sterownik jest już skonfigurowany.",
+      "reauth_successful": "Dane logowania zostały zaktualizowane."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcje pieca Pello",
+        "data": {
+          "scan_interval": "Częstotliwość odświeżania (sekundy)"
+        }
+      }
+    }
+  },
+  "services": {
+    "add_fuel": {
+      "name": "Dodaj zasyp paliwa",
+      "description": "Rejestruje zasyp pelletu w sterowniku: zasobnik jest traktowany jako pełny, a prognoza zużycia startuje od nowa.",
+      "fields": {
+        "amount": {
+          "name": "Ilość",
+          "description": "Ilość wsypanego paliwa w kilogramach (1–200)."
+        },
+        "config_entry_id": {
+          "name": "Sterownik",
+          "description": "Wymagane tylko, gdy skonfigurowano więcej niż jeden piec."
+        }
+      }
+    }
+  }
+}

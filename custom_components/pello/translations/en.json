@@ -1,0 +1,59 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Pello boiler setup",
+        "description": "Enter the local IP address of the Pello v3.5 controller and the credentials of its web panel.",
+        "data": {
+          "host": "Controller IP address",
+          "username": "Username",
+          "password": "Password",
+          "scan_interval": "Update interval (seconds)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Pello boiler",
+        "description": "The controller rejected the credentials. Enter the current username and password.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the controller. Check the IP address.",
+      "invalid_auth": "Invalid username or password.",
+      "not_pello": "The device at this address does not look like a Pello controller."
+    },
+    "abort": {
+      "already_configured": "This controller is already configured.",
+      "reauth_successful": "Credentials updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Pello boiler options",
+        "data": {
+          "scan_interval": "Update interval (seconds)"
+        }
+      }
+    }
+  },
+  "services": {
+    "add_fuel": {
+      "name": "Add fuel",
+      "description": "Records a pellet refill in the controller: the hopper is treated as full and the consumption estimate restarts.",
+      "fields": {
+        "amount": {
+          "name": "Amount",
+          "description": "Amount of fuel added, in kilograms (1–200)."
+        },
+        "config_entry_id": {
+          "name": "Controller",
+          "description": "Required only when more than one boiler is configured."
+        }
+      }
+    }
+  }
+}
