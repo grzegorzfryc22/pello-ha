@@ -29,7 +29,7 @@ class PelloNumberDef:
 # Wartości spoza zakresu sterownik i tak odrzuca.
 NUMBERS: tuple[PelloNumberDef, ...] = (
     PelloNumberDef(key="cwu_tzad", name="Zadana temperatura CWU", minimum=20, maximum=60),
-    PelloNumberDef(key="kot_tzad", name="Zadana temperatura kotła CO", minimum=55, maximum=80),
+    PelloNumberDef(key="kot_tzad", name="Zadana temperatura kotła CO", minimum=42, maximum=80),
     PelloNumberDef(
         key="ob1_tzad",
         name="Zadana temperatura za zaworem",

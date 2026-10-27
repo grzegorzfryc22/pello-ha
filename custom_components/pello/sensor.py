@@ -214,7 +214,7 @@ SENSORS: tuple[PelloSensorDef, ...] = (
     ),
     _temp(
         "mpl_temp",
-        "Temperatura modułu palnika",
+        "Temperatura podajnika",
         "mdi:thermometer",
         category=EntityCategory.DIAGNOSTIC,
     ),

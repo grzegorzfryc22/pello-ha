@@ -29,4 +29,4 @@ SERVICE_ADD_FUEL: Final = "add_fuel"
 ATTR_AMOUNT: Final = "amount"
 ATTR_CONFIG_ENTRY_ID: Final = "config_entry_id"
 ADD_FUEL_MIN: Final = 1
-ADD_FUEL_MAX: Final = 200
+ADD_FUEL_MAX: Final = 700

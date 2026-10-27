@@ -47,7 +47,7 @@
       "fields": {
         "amount": {
           "name": "Amount",
-          "description": "Amount of fuel added, in kilograms (1–200)."
+          "description": "Amount of fuel added, in kilograms (1–700)."
         },
         "config_entry_id": {
           "name": "Controller",

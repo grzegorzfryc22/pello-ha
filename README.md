@@ -17,11 +17,11 @@ Działa lokalnie, bez chmury: odczyt przez `syncvalues.cgi`, zapis przez `setreg
 **Sterowanie**
 - ❄️/☀️ Tryb **Zima / Lato / Auto-lato**.
 - 🚿 Tryb **CWU**: wyłączona, harmonogram, włączona, +1 h, +2 h.
-- 🌡️ Temperatura zadana: **CWU** (20–60 °C), **kotła CO** (55–80 °C), **za zaworem 4D** (20–80 °C).
+- 🌡️ Temperatura zadana: **CWU** (20–60 °C), **kotła CO** (42–80 °C), **za zaworem 4D** (20–80 °C).
 - 🏠 Temperatury pokojowe obiegu 1: niska / normalna / komfortowa (5–35 °C, co 0,1 °C).
 - 🌦️ Regulator pogodowy kotła i obiegu za zaworem (włącz/wyłącz).
 - 🔕 Przycisk **Kasuj alarmy**.
-- ⛽ Akcja `pello.add_fuel` — rejestracja zasypu (1–200 kg).
+- ⛽ Akcja `pello.add_fuel` — rejestracja zasypu (1–700 kg).
 - ⚙️ Tryb **Automatyczny / Ręczny** — domyślnie wyłączony, patrz niżej.
 
 Zakresy nastaw są zgodne ze słownikiem rejestrów sterownika. Wartość spoza zakresu sterownik odrzuci,
@@ -57,4 +57,4 @@ Częstotliwość odświeżania zmienisz później w **Konfiguruj** przy integrac
 - Istniejące encje zachowują identyfikatory (`entity_id`) i historię.
 - Nazwy wyświetlane mają teraz prefiks urządzenia („Piec Pello 3.5 …”), zgodnie ze standardem HA.
 - Sensor „Temperatura CO 1” nazywa się teraz „Temperatura pokojowa” — to czujnik pokojowy obiegu 1.
-- Zakres zadanej temperatury kotła to 55–80 °C (taki przyjmuje sterownik).
+- Zakres zadanej temperatury kotła to 42–80 °C (taki przyjmuje sterownik).

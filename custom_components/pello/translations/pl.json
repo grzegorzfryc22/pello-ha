@@ -47,7 +47,7 @@
       "fields": {
         "amount": {
           "name": "Ilość",
-          "description": "Ilość wsypanego paliwa w kilogramach (1–200)."
+          "description": "Ilość wsypanego paliwa w kilogramach (1–700)."
         },
         "config_entry_id": {
           "name": "Sterownik",

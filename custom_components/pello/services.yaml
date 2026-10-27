@@ -6,7 +6,7 @@ add_fuel:
       selector:
         number:
           min: 1
-          max: 200
+          max: 700
           step: 1
           unit_of_measurement: kg
           mode: box
